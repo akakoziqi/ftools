@@ -39,7 +39,6 @@
 #include <stdbool.h>
 #include "utl_ffmt.h"
 #include "utl_ffpm.h"
-#include <stdio.h>
 
 /// @brief fmt 参数存储大小 枚举
 typedef enum tagFFMT_Size
@@ -396,7 +395,6 @@ ffmt_error_handler:
 	// 没问题正常返回
 	if (ret == FFMT_Error_None)
 	{
-		printf("%s", buffer);
 		return fmt_count;
 	}
 	// 寄了，尝试强制结束字符串
