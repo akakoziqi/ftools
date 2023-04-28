@@ -1,6 +1,6 @@
-# ftools 套件
+# efsuite - embedded fast suite
 
-目前，fast tools 以下内容：
+目前，efsuite 以下内容：
 
 - ffpm - 快速定点运算数学库
 - ffmt - 快速格式化库
