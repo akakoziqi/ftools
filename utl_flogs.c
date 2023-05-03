@@ -42,6 +42,9 @@
 #define LOG_COLOR_VIOLATE "\033[36m"
 #define LOG_COLOR_WHITE "\033[37m"
 
+/// @brief 日志输出函数指针
+static void (*log_output_pfun)(char* buffer, uint32_t size) = 0;
+
 /// @brief 日志缓冲区
 static char log_buffer[LOG_BUFFER_MAX_SIZE] = {0};
 
@@ -69,10 +72,10 @@ static const char *log_level_prefix[] =
 };
 
 /// @brief flogs 初始化
-/// @param  
-extern void flogs_init(void)
+/// @param log_output_pfun 参数为 buffer 指针，长度的输出定向函数
+extern void flogs_init(void (*pfun_output)(char* buffer, uint32_t size))
 {
-    /* 如果需要，在这里定义您的底层初始化 */
+    log_output_pfun = pfun_output;
 }
 
 /// @brief 追加字符串
@@ -99,7 +102,7 @@ static char *append2String(char *string, const char *append)
 /// @param fmt 格式化字符串
 /// @param  
 /// @return 输出字符串长度或错误值（-1）
-extern int32_t flogs(short level, const char *tag, char *fmt, ...)
+extern int32_t flogs(uint8_t level, const char *tag, char *fmt, ...)
 {
     char *pBuffer = log_buffer;
     int32_t length;
@@ -116,7 +119,7 @@ extern int32_t flogs(short level, const char *tag, char *fmt, ...)
 
     length += LOG_BUFFER_MAX_SIZE - buf_count;
 
-    /* 在这里输出 Buffer 中的字符串，最好使用 DMA 等方式 */
+    log_output_pfun(log_buffer, length);
 
     return length;
 }

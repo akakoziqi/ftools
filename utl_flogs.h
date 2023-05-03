@@ -77,7 +77,7 @@
 #define FLOGE(tag, ...)
 #endif
 
-extern void flogs_init(void);
-extern int32_t flogs(short level, const char *tag, char *fmt, ...);
+extern void flogs_init(void (*pfun_output)(char* buffer, uint32_t size));
+extern int32_t flogs(uint8_t level, const char *tag, char *fmt, ...);
 
 #endif
