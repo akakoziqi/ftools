@@ -25,7 +25,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- * 
+ *
  * 本程序仅供参考，使用本程序造成的一切后果与作者无关，由您自己负责。
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -43,31 +43,38 @@
 /// @brief fmt 参数存储大小 枚举
 typedef enum tagFFMT_Size
 {
-	FFMT_Size_8,	/* 8 位 */
-	FFMT_Size_16,	/* 16 位 */
-	FFMT_Size_32	/* 32 位 */
+	FFMT_Size_8,  /* 8 位 */
+	FFMT_Size_16, /* 16 位 */
+	FFMT_Size_32  /* 32 位 */
 } FFMT_Size;
 
 /// @brief fmt 参数符号类型 枚举
 typedef enum tagFFMT_Type
 {
 	FFMT_Type_Signed,	/* 有符号数 */
-	FFMT_Type_Unsigned,	/* 无符号数 */
+	FFMT_Type_Unsigned, /* 无符号数 */
 } FFMT_Type;
 
 /// @brief fmt 参数输出进制 枚举
 typedef enum tagFFMT_Base
 {
-	FFMT_Base_DEC,	/* 十进制 */
-	FFMT_Base_HEX,	/* 十六进制 */
+	FFMT_Base_DEC, /* 十进制 */
+	FFMT_Base_HEX, /* 十六进制 */
 } FFMT_Base;
+
+/// @brief fmt 参数输出进制 枚举
+typedef enum tagFFMT_Sign
+{
+	FFMT_Sign_Hide, /* 隐藏符号位 */
+	FFMT_Sign_Disp, /* 显示符号位 */
+} FFMT_Sign;
 
 /// @brief fmt 错误类型 枚举
 typedef enum tagFFMT_Error
 {
-	FFMT_Error_None = 0,			/* 无错误 */
-	FFMT_Error_ArgsErr = 1 << 0,	/* 参数错误 */
-	FFMT_Error_Overflow = 1 << 2,	/* 缓存溢出 */
+	FFMT_Error_None = 0,		  /* 无错误 */
+	FFMT_Error_ArgsErr = 1 << 0,  /* 参数错误 */
+	FFMT_Error_Overflow = 1 << 2, /* 缓存溢出 */
 } FFMT_Error;
 
 /// @brief fmt 当前缓存计数
@@ -81,6 +88,9 @@ static FFMT_Type fmt_type = FFMT_Type_Signed;
 
 /// @brief fmt 当前输出进制
 static FFMT_Base fmt_base = FFMT_Base_DEC;
+
+/// @brief fmt 当前输出符号位
+static FFMT_Sign fmt_sign = FFMT_Sign_Hide;
 
 /// @brief fmt 缓冲区最大长度
 static uint32_t fmt_buffer_max = 0;
@@ -137,12 +147,13 @@ static inline FFMT_Error ffmt_push_char(char *buffer, char c)
 }
 
 /// @brief fmt 完成，恢复默认状态
-/// @param  
+/// @param
 static inline void ffmt_default(void)
 {
 	fmt_size = FFMT_Size_16;
 	fmt_type = FFMT_Type_Signed;
 	fmt_base = FFMT_Base_DEC;
+	fmt_sign = FFMT_Sign_Hide;
 }
 
 /// @brief 无符号数 转 字符串
@@ -213,7 +224,10 @@ static FFMT_Error ffmt_itos(char *buffer, int32_t num)
 		}
 		else
 		{
-			ret |= ffmt_push_char(buffer, '+');
+			if (fmt_sign == FFMT_Sign_Disp)
+			{
+				ret |= ffmt_push_char(buffer, '+');
+			}
 			ret |= ffmt_utos(buffer, (uint32_t)num);
 		}
 	}
@@ -235,7 +249,10 @@ static inline FFMT_Error ffmt_fq12(char *buffer, fq12_t num)
 	int32_t decimal;
 	if (num > 0)
 	{
-		ret |= ffmt_push_char(buffer, '+');
+		if (fmt_sign == FFMT_Sign_Disp)
+		{
+			ret |= ffmt_push_char(buffer, '+');
+		}
 		integer = (num >> 12);
 		decimal = ((num & (0x00000FFF)) * 100000) >> 12;
 	}
@@ -273,7 +290,7 @@ static inline FFMT_Error ffmt_fq12(char *buffer, fq12_t num)
 /// @param max_len 缓存最大长度
 /// @param vs 是否传入可变参数列表
 /// @param fmt 格式化字符串
-/// @param  
+/// @param
 /// @return 输出字符串长度或错误值（-1）
 extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 {
@@ -287,39 +304,56 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 	// 如果上一级传入了 va_list 就替换掉
 	if (vs)
 	{
-		ap_vs = va_arg(ap, va_list*);
+		ap_vs = va_arg(ap, va_list *);
 	}
 	else
 	{
 		ap_vs = &ap;
 	}
-	
+
 	while (GET_CHAR(fmt) != '\0')
 	{
 		if (GET_CHAR(fmt) == '%') // 当前字符是 %
 		{
 			MOVE_TO_NEXT(fmt);
-			// 首先查找 % / s / h / l
+		ffmt_parse_sign:
+			// 查找 % / s / + / -
 			switch (GET_CHAR(fmt))
 			{
 			case '%': // 打印 %
 				ret |= ffmt_push_char(buffer, '%');
 				MOVE_TO_NEXT(fmt);
 				goto fmt_next_loop;
+			case '+': // 显示符号位
+				fmt_sign = FFMT_Sign_Disp;
+				MOVE_TO_NEXT(fmt);
+				goto ffmt_parse_length;
+			case 's': // 字符串
+				goto fmt_str;
+			case '-': // 隐藏符号位
+				fmt_sign = FFMT_Sign_Hide;
+				MOVE_TO_NEXT(fmt);
+				goto ffmt_parse_length;
+			default: // 继续查找 h / l
+				goto ffmt_parse_length;
+			}
+		ffmt_parse_length:
+			// 查找  h / l
+			switch (GET_CHAR(fmt))
+			{
 			case 'h': // 8 位
 				fmt_size = FFMT_Size_8;
 				MOVE_TO_NEXT(fmt);
-				goto parse_next_stage;
+				goto ffmt_parse_type;
 			case 'l': // 32 位
 				fmt_size = FFMT_Size_32;
 				MOVE_TO_NEXT(fmt);
-				goto parse_next_stage;
-			case 's': // 字符串
-				goto fmt_str;
+				goto ffmt_parse_type;
 			default: // 继续查找 d / f / u / x
-				goto parse_next_stage;
+				goto ffmt_parse_type;
 			}
-		parse_next_stage:
+		ffmt_parse_type:
+			// 查找 d / f / u / x
 			switch (GET_CHAR(fmt))
 			{
 			case 'd': // 有符号十进制整数
@@ -337,7 +371,7 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 				fmt_size = FFMT_Size_32;
 				goto fmt_fq12;
 			default: // 参数匹配错误，退出
-				ret = FFMT_Error_ArgsErr;
+				ret |= FFMT_Error_ArgsErr;
 				goto ffmt_error_handler;
 			}
 		}
@@ -407,9 +441,9 @@ ffmt_error_handler:
 /// @param buffer 缓存
 /// @param max_len 缓存最大长度
 /// @param fmt 格式化字符串
-/// @param agrs 
+/// @param agrs
 /// @return 输出字符串长度或错误值（-1）
-extern int32_t vsffmt(char *buffer, uint32_t max_len, char *fmt, va_list* agrs)
+extern int32_t vsffmt(char *buffer, uint32_t max_len, char *fmt, va_list *agrs)
 {
 	return ffmt(buffer, max_len, true, fmt, agrs);
 }
