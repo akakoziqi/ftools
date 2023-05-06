@@ -104,6 +104,26 @@ static const char fmt_index[] = "0123456789ABCDEF";
 // 移动 指针 到下一个位置
 #define MOVE_TO_NEXT(fmt) ((fmt)++)
 
+// 检查错误并返回
+#define CHECK_RET(expr)             \
+	{                               \
+		ret |= expr;                \
+		if (ret != FFMT_Error_None) \
+		{                           \
+			return ret;             \
+		}                           \
+	}
+
+// 检查错误并跳转
+#define CHECK_GOTO(expr, loc)       \
+	{                               \
+		ret |= expr;                \
+		if (ret != FFMT_Error_None) \
+		{                           \
+			goto loc;               \
+		}                           \
+	}
+
 /// @brief 快速模 10 函数
 /// @param x 输入
 /// @param div 输入 / 10
@@ -172,7 +192,7 @@ static FFMT_Error ffmt_utos(char *buffer, uint32_t num)
 		do
 		{
 			div_mod_10(num, &div, &rem);
-			ret |= ffmt_push_char(buffer, fmt_index[rem]);
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[rem]));
 			num = div;
 		} while (num);
 
@@ -193,16 +213,16 @@ static FFMT_Error ffmt_utos(char *buffer, uint32_t num)
 		switch (fmt_size)
 		{
 		case FFMT_Size_32:
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 28) & 0x0000000F]);
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 24) & 0x0000000F]);
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 20) & 0x0000000F]);
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 16) & 0x0000000F]);
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 28) & 0x0000000F]));
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 24) & 0x0000000F]));
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 20) & 0x0000000F]));
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 16) & 0x0000000F]));
 		case FFMT_Size_16:
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 12) & 0x0000000F]);
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 8) & 0x0000000F]);
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 12) & 0x0000000F]));
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 8) & 0x0000000F]));
 		case FFMT_Size_8:
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 4) & 0x0000000F]);
-			ret |= ffmt_push_char(buffer, fmt_index[(num >> 0) & 0x0000000F]);
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 4) & 0x0000000F]));
+			CHECK_RET(ffmt_push_char(buffer, fmt_index[(num >> 0) & 0x0000000F]));
 		}
 	}
 	return ret;
@@ -219,21 +239,21 @@ static FFMT_Error ffmt_itos(char *buffer, int32_t num)
 	{
 		if (num < 0)
 		{
-			ret |= ffmt_push_char(buffer, '-');
-			ret |= ffmt_utos(buffer, (uint32_t)(-num));
+			CHECK_RET(ffmt_push_char(buffer, '-'));
+			CHECK_RET(ffmt_utos(buffer, (uint32_t)(-num)));
 		}
 		else
 		{
 			if (fmt_sign == FFMT_Sign_Disp)
 			{
-				ret |= ffmt_push_char(buffer, '+');
+				CHECK_RET(ffmt_push_char(buffer, '+'));
 			}
-			ret |= ffmt_utos(buffer, (uint32_t)num);
+			CHECK_RET(ffmt_utos(buffer, (uint32_t)num));
 		}
 	}
 	else
 	{
-		ret |= ffmt_utos(buffer, (uint32_t)num);
+		CHECK_RET(ffmt_utos(buffer, (uint32_t)num));
 	}
 	return ret;
 }
@@ -251,37 +271,37 @@ static inline FFMT_Error ffmt_fq12(char *buffer, fq12_t num)
 	{
 		if (fmt_sign == FFMT_Sign_Disp)
 		{
-			ret |= ffmt_push_char(buffer, '+');
+			CHECK_RET(ffmt_push_char(buffer, '+'));
 		}
 		integer = (num >> 12);
 		decimal = ((num & (0x00000FFF)) * 100000) >> 12;
 	}
 	else
 	{
-		ret |= ffmt_push_char(buffer, '-');
+		CHECK_RET(ffmt_push_char(buffer, '-'));
 		integer = (-num >> 12);
 		decimal = ((-num & (0x00000FFF)) * 100000) >> 12;
 	}
 
-	ret |= ffmt_utos(buffer, integer);
-	ret |= ffmt_push_char(buffer, '.');
+	CHECK_RET(ffmt_utos(buffer, integer));
+	CHECK_RET(ffmt_push_char(buffer, '.'));
 	if (decimal < 10)
 	{
-		ret |= ffmt_push_char(buffer, '0');
+		CHECK_RET(ffmt_push_char(buffer, '0'));
 	}
 	if (decimal < 100)
 	{
-		ret |= ffmt_push_char(buffer, '0');
+		CHECK_RET(ffmt_push_char(buffer, '0'));
 	}
 	if (decimal < 1000)
 	{
-		ret |= ffmt_push_char(buffer, '0');
+		CHECK_RET(ffmt_push_char(buffer, '0'));
 	}
 	if (decimal < 10000)
 	{
-		ret |= ffmt_push_char(buffer, '0');
+		CHECK_RET(ffmt_push_char(buffer, '0'));
 	}
-	ret |= ffmt_utos(buffer, decimal);
+	CHECK_RET(ffmt_utos(buffer, decimal));
 	return ret;
 }
 
@@ -321,7 +341,7 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 			switch (GET_CHAR(fmt))
 			{
 			case '%': // 打印 %
-				ret |= ffmt_push_char(buffer, '%');
+				CHECK_GOTO(ffmt_push_char(buffer, '%'), ffmt_error_handler);
 				MOVE_TO_NEXT(fmt);
 				goto fmt_next_loop;
 			case '+': // 显示符号位
@@ -378,7 +398,7 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 		else // 当前字符不是 %
 		{
 			// 正常输出
-			ret |= ffmt_push_char(buffer, GET_CHAR(fmt));
+			CHECK_GOTO(ffmt_push_char(buffer, GET_CHAR(fmt)), ffmt_error_handler);
 			// 移动到下一个字符
 			MOVE_TO_NEXT(fmt);
 			goto fmt_next_loop;
@@ -390,7 +410,7 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 			char *pString = va_arg(ap, char *);
 			while (GET_CHAR(pString) != '\0')
 			{
-				ret |= ffmt_push_char(buffer, GET_CHAR(pString));
+				CHECK_GOTO(ffmt_push_char(buffer, GET_CHAR(pString)), ffmt_error_handler);
 				MOVE_TO_NEXT(pString);
 			}
 		}
@@ -401,18 +421,19 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 		{
 			if (fmt_type == FFMT_Type_Signed)
 			{
-				ret |= ffmt_itos(buffer, va_arg(*ap_vs, int32_t));
+				
+				CHECK_GOTO(ffmt_itos(buffer, va_arg(*ap_vs, int32_t)), ffmt_error_handler);
 			}
 			if (fmt_type == FFMT_Type_Unsigned)
 			{
-				ret |= ffmt_utos(buffer, va_arg(*ap_vs, uint32_t));
+				CHECK_GOTO(ffmt_utos(buffer, va_arg(*ap_vs, uint32_t)), ffmt_error_handler);
 			}
 		}
 		goto fmt_finish;
 
 	fmt_fq12: // 格式化
 		MOVE_TO_NEXT(fmt);
-		ret |= ffmt_fq12(buffer, va_arg(*ap_vs, fq12_t));
+		CHECK_GOTO(ffmt_fq12(buffer, va_arg(*ap_vs, fq12_t)), ffmt_error_handler);
 		goto fmt_finish;
 
 	fmt_finish: // 完成一次格式化，重置参数
@@ -422,7 +443,7 @@ extern int32_t ffmt(char *buffer, uint32_t max_len, bool vs, char *fmt, ...)
 		continue;
 	}
 	// 正常字符串结束
-	ret |= ffmt_push_char(buffer, '\0');
+	CHECK_GOTO(ffmt_push_char(buffer, '\0'), ffmt_error_handler);
 
 ffmt_error_handler:
 	va_end(ap);
