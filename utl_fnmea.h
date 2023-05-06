@@ -50,7 +50,6 @@
  * 5. 地面速度（kph、sog）
  * 6. 地面航向（正北方向角、磁北方向角）
  * 7. 定位精度（精度因子、可见卫星数）
- * 8. 可见卫星数
  *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 #ifndef __UTL_FNMEA_H__
@@ -60,6 +59,8 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+#define FNMEA_BUFFER_MAX_SUZE 256
+
 /// @brief 定位状态定义
 typedef enum tagFNMEA_Status
 {
@@ -68,6 +69,15 @@ typedef enum tagFNMEA_Status
 	FNMEA_STAT_Invalid,		 // 数据无效（N）
 	FNMEA_STAT_Differential, // 差分模式（D）
 } fnmea_status_e;
+
+/// @brief 定位类型定义
+typedef enum tagFNMEA_Type
+{
+	FNMEA_TYPE_BD,	 // 北斗导航卫星系统（BDS）
+	FNMEA_TYPE_GP,	 // 全球定位系统（GPS、SBAS、QZSS） 
+	FNMEA_TYPE_GL,		 // 格洛纳斯定位系统（GLONASS） 
+	FNMEA_TYPE_GN, // 全球导航卫星系统（GNSS） 
+} fnmea_type_e;
 
 /// @brief UTC 时间定义
 typedef struct tagFNMEA_UTC_Time
@@ -81,9 +91,9 @@ typedef struct tagFNMEA_UTC_Time
 /// @brief UTC 日期定义
 typedef struct tagFNMEA_UTC_Date
 {
-	uint16_t year; // 年
 	uint8_t mon;   // 月
 	uint8_t day;   // 日
+	uint16_t year; // 年
 } fnmea_utc_date_t;
 
 /// @brief 经度信息定义
@@ -133,5 +143,7 @@ typedef struct tagFNMEA_Precision
 	uint8_t hdop;		   // 水平精度因子
 	uint8_t vdpop;		   // 垂直精度因子
 } fnmea_precision;
+
+
 
 #endif
