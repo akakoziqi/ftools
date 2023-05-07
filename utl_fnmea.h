@@ -59,7 +59,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
-#define FNMEA_BUFFER_MAX_SUZE 256
+#define FNMEA_BUFFER_MAX_SIZE 256
 
 /// @brief 定位状态定义
 typedef enum tagFNMEA_Status
@@ -85,7 +85,7 @@ typedef struct tagFNMEA_UTC_Time
 	uint8_t hour; // 小时
 	uint8_t min;  // 分钟
 	uint8_t sec;  // 秒
-	uint8_t msec; // 毫秒
+	uint16_t msec; // 毫秒
 } fnmea_utc_time_t;
 
 /// @brief UTC 日期定义
@@ -97,28 +97,20 @@ typedef struct tagFNMEA_UTC_Date
 } fnmea_utc_date_t;
 
 /// @brief 经度信息定义
-typedef struct tagFNMEA_Longitude
+typedef struct tagFNMEA_Degree
 {
-	uint8_t ew;	 // 东西经，东经为 0，西经为非 0（通常为 1）
+	uint8_t sign;// 东西经，东经为 0，西经为非 0（通常为 1）
+				 // 南北纬，南纬为 0，北纬为非 0（通常为 1）
 	uint8_t deg; // 度
-	uint8_t min; // 分
-	uint8_t sec; // 秒
-} fnmea_longitude_t;
-
-/// @brief 纬度信息定义
-typedef struct tagFNMEA_Latitude
-{
-	uint8_t ns;	 // 南北纬，南纬为 0，北纬为非 0（通常为 1）
-	uint8_t deg; // 度
-	uint8_t min; // 分
-	uint8_t sec; // 秒
-} fnmea_latitude_t;
+	uint8_t min; // 分(整数部分)
+	uint16_t min_dec; // 分(小数部分)
+} fnmea_degree_t;
 
 /// @brief 位置信息（经纬度）定义
 typedef struct tagFNMEA_Location
 {
-	fnmea_longitude_t longi; // 经度
-	fnmea_latitude_t lati;	 // 纬度
+	fnmea_degree_t longi; // 经度
+	fnmea_degree_t lati;	 // 纬度
 	int32_t alti;			 // Q12 海拔
 } fnmea_location_t;
 
