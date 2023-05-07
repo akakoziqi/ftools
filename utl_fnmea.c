@@ -40,6 +40,7 @@
 #define MOVE_TO_NEXT() {if(nmea_buffer_cnt<=FNMEA_BUFFER_MAX_SIZE)nmea_buffer_cnt++;else{return FNMEA_Error_Overflow;}}
 #define CHECK_RETURN(expr) {ret=expr;if(ret!=FNMEA_Error_None){return ret;}}
 #define MOVE_TO_HEAD() (nmea_buffer_cnt=0) 
+#define MOVE_TO_NEXT_PARAM(buf) {while(INDEX_BUFFER(buf)!=','){MOVE_TO_NEXT();}MOVE_TO_NEXT();}
 
 typedef enum tagFNMEA_CMD_Type
 {
@@ -60,20 +61,13 @@ typedef enum tagFNMEA_Error_Type
 	FNMEA_Error_Parse_int32,
 	FNMEA_Error_Parse_type,
 	FNMEA_Error_Parse_CMD_type,
-	FNMEA_Error_Parse_Dot,
-	FNMEA_Error_Parse_Comma,
+	FNMEA_Error_Parse_Fix_Char
 
 } FNMEA_Error_Type;
 
 static FNMEA_CMD_Type nmea_cmd_type;
-static fnmea_type_e nmea_type;
-static fnmea_status_e nmea_staus;
-static fnmea_utc_time_t nmea_time;
-static fnmea_utc_date_t nmea_date;
-static fnmea_location_t nmea_locate;
-static fnmea_speed_t nmea_speed;
-static fnmea_angle_t nmea_angle;
-static fnmea_precision nmea_preci;
+
+static fnmea_t fnema;
 
 /// @brief NMEA Buffer 计数
 uint32_t nmea_buffer_cnt = 0;
@@ -133,7 +127,7 @@ static void div_mod_100(uint32_t x, uint32_t* div, uint32_t* rem)
 }
 
 /// 
-static FNMEA_Error_Type f_parse_uint8(char* pbuffer, uint8_t* pNum)
+static FNMEA_Error_Type fnmea_parse_uint8(char* pbuffer, uint8_t* pNum)
 {
 	uint8_t num = 0;
 	while (INDEX_BUFFER(pbuffer) != ',' && INDEX_BUFFER(pbuffer) != '.' && INDEX_BUFFER(pbuffer) != '\0')
@@ -150,7 +144,7 @@ static FNMEA_Error_Type f_parse_uint8(char* pbuffer, uint8_t* pNum)
 }
 
 /// 
-static FNMEA_Error_Type f_parse_uint16(char* pbuffer, uint16_t* pNum)
+static FNMEA_Error_Type fnmea_parse_uint16(char* pbuffer, uint16_t* pNum)
 {
 	uint16_t num = 0;
 	while (INDEX_BUFFER(pbuffer) != ',' && INDEX_BUFFER(pbuffer) != '.' && INDEX_BUFFER(pbuffer) != '\0')
@@ -167,7 +161,7 @@ static FNMEA_Error_Type f_parse_uint16(char* pbuffer, uint16_t* pNum)
 }
 
 /// 
-static FNMEA_Error_Type f_parse_int32(char* pbuffer, int32_t* pNum)
+static FNMEA_Error_Type fnmea_parse_int32(char* pbuffer, int32_t* pNum)
 {
 	int32_t num = 0;
 	int8_t sign = 1;
@@ -192,7 +186,7 @@ static FNMEA_Error_Type f_parse_int32(char* pbuffer, int32_t* pNum)
 }
 
 /// 
-static FNMEA_Error_Type f_parse_nmea_type(char* pbuffer, fnmea_type_e* type)
+static FNMEA_Error_Type fnmea_parse_type(char* pbuffer, fnmea_type_e* type)
 {
 	// 第一个字符
 	switch (INDEX_BUFFER(pbuffer))
@@ -237,7 +231,7 @@ parse_nmea_type_stage_1b:
 }
 
 /// 
-static FNMEA_Error_Type f_parse_nmea_cmd_type(char* pbuffer, FNMEA_CMD_Type* cmd)
+static FNMEA_Error_Type fnmea_parse_cmd_type(char* pbuffer, FNMEA_CMD_Type* cmd)
 {
 	// 第一个字符
 	switch (INDEX_BUFFER(pbuffer))
@@ -340,7 +334,7 @@ parse_nmea_cmd_type_stage_1v2t:
 	}
 }
 
-static FNMEA_Error_Type f_parse_nmea_fix_char(char* pbuffer, char fix)
+static FNMEA_Error_Type fnmea_parse_fix_char(char* pbuffer, char fix)
 {
 	if (INDEX_BUFFER(pbuffer) == fix)
 	{
@@ -349,12 +343,11 @@ static FNMEA_Error_Type f_parse_nmea_fix_char(char* pbuffer, char fix)
 	}
 	else
 	{
-		return FNMEA_Error_Parse_Dot;
+		return FNMEA_Error_Parse_Fix_Char;
 	}
 }
 
-
-static FNMEA_Error_Type f_parse_nmea_utc_time(char* pbuffer, fnmea_utc_time_t* time)
+static FNMEA_Error_Type fnmea_parse_utc_time(char* pbuffer, fnmea_utc_time_t* time)
 {
 	FNMEA_Error_Type ret = FNMEA_Error_None;
 	int32_t time_num;
@@ -362,7 +355,7 @@ static FNMEA_Error_Type f_parse_nmea_utc_time(char* pbuffer, fnmea_utc_time_t* t
 	uint32_t rem;
 
 	// 获取时间信息
-	CHECK_RETURN(f_parse_int32(pbuffer, &time_num));
+	CHECK_RETURN(fnmea_parse_int32(pbuffer, &time_num));
 	// 解析秒
 	div_mod_100((uint32_t)time_num, &div, &rem);
 	time->sec = rem;
@@ -371,14 +364,14 @@ static FNMEA_Error_Type f_parse_nmea_utc_time(char* pbuffer, fnmea_utc_time_t* t
 	time->min = rem;
 	time->hour = div;
 	// 解析小数点
-	CHECK_RETURN(f_parse_nmea_fix_char(pbuffer, '.'));
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, '.'));
 	// 解析毫秒
-	CHECK_RETURN(f_parse_uint16(pbuffer, &time->msec));
+	CHECK_RETURN(fnmea_parse_uint16(pbuffer, &time->msec));
 
 	return ret;
 }
 
-static FNMEA_Error_Type f_parse_nmea_degree(char* pbuffer, fnmea_degree_t* degree)
+static FNMEA_Error_Type fnmea_parse_degree(char* pbuffer, fnmea_degree_t* degree)
 {
 	FNMEA_Error_Type ret;
 	uint16_t integer;
@@ -388,9 +381,9 @@ static FNMEA_Error_Type f_parse_nmea_degree(char* pbuffer, fnmea_degree_t* degre
 	uint32_t rem;
 
 	// 格式为：(d)ddmm.mmmm
-	CHECK_RETURN(f_parse_uint16(pbuffer, &integer)); // (d)ddmm
-	CHECK_RETURN(f_parse_nmea_fix_char(pbuffer, '.'));// .
-	CHECK_RETURN(f_parse_uint16(pbuffer, &decimal));// mmmm
+	CHECK_RETURN(fnmea_parse_uint16(pbuffer, &integer)); // (d)ddmm
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, '.'));// .
+	CHECK_RETURN(fnmea_parse_uint16(pbuffer, &decimal));// mmmm
 
 	// 解析：(d)dd
 	div_mod_100((uint32_t)integer, &div, &rem);
@@ -402,8 +395,58 @@ static FNMEA_Error_Type f_parse_nmea_degree(char* pbuffer, fnmea_degree_t* degre
 	return ret;
 }
 
+static FNMEA_Error_Type fnmea_parse_location(char* pbuffer, fnmea_location_t* locate)
+{
+	FNMEA_Error_Type ret = FNMEA_Error_None;
+	// 纬度数值
+	CHECK_RETURN(fnmea_parse_degree(pbuffer, &locate->lati));
+	// ,
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, ','));
+	// 纬度符号
+	if (INDEX_BUFFER(pbuffer) == 'N')
+		locate->lati.sign = 1;
+	else if (INDEX_BUFFER(pbuffer) == 'S')
+		locate->lati.sign = 0;
+	else
+		return FNMEA_Error_Parse_Fix_Char;
+
+	MOVE_TO_NEXT();
+	// ,
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, ','));
+	// 经度数值
+	CHECK_RETURN(fnmea_parse_degree(pbuffer, &locate->longi));
+	// ,
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, ','));
+	// 经度符号
+	if (INDEX_BUFFER(pbuffer) == 'E')
+		locate->longi.sign = 0;
+	else if (INDEX_BUFFER(pbuffer) == 'W')
+		locate->longi.sign = 1;
+	else
+		return FNMEA_Error_Parse_Fix_Char;
+
+	MOVE_TO_NEXT();
+	// ,
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, ','));
+}
+
+
+
+
+static FNMEA_Error_Type fnmea_parse_cmd_GCA(char* pbuffer, fnmea_t* nmea)
+{
+	FNMEA_Error_Type ret = FNMEA_Error_None;
+	CHECK_RETURN(fnmea_parse_fix_char(pbuffer, '$'));
+	CHECK_RETURN(fnmea_parse_utc_time(pbuffer, &nmea->utc_time));
+	CHECK_RETURN(fnmea_parse_location(pbuffer, &nmea->locate));
+	MOVE_TO_NEXT_PARAM(pbuffer);
+
+
+}
+
 char utc_time_test_buffer[FNMEA_BUFFER_MAX_SIZE] = "235316.000";
 char degree_test_buffer[FNMEA_BUFFER_MAX_SIZE] = "12000.0090";
+char location_test_buffer[FNMEA_BUFFER_MAX_SIZE] = "2959.9925,N,12000.0090,W,";
 
 
 int main(void)
@@ -411,10 +454,14 @@ int main(void)
 	FNMEA_Error_Type ret = FNMEA_Error_None;
 	fnmea_utc_time_t time;
 	fnmea_degree_t degree;
+	fnmea_location_t locate;
 
-	ret = f_parse_nmea_utc_time(utc_time_test_buffer, &time);
+	ret = fnmea_parse_utc_time(utc_time_test_buffer, &time);
 	MOVE_TO_HEAD();
-	ret = f_parse_nmea_degree(degree_test_buffer, &degree);
+	ret = fnmea_parse_degree(degree_test_buffer, &degree);
 	MOVE_TO_HEAD();
+	ret = fnmea_parse_location(location_test_buffer, &locate);
+	MOVE_TO_HEAD();
+
 	return 0;
 }

@@ -136,6 +136,16 @@ typedef struct tagFNMEA_Precision
 	uint8_t vdpop;		   // 垂直精度因子
 } fnmea_precision;
 
-
+typedef struct tagFNEMA
+{
+	fnmea_type_e type;
+	fnmea_status_e staus;
+	fnmea_utc_time_t utc_time;
+	fnmea_utc_date_t utc_date;
+	fnmea_location_t locate;
+	fnmea_speed_t speed;
+	fnmea_angle_t angle;
+	fnmea_precision precision;
+} fnmea_t;
 
 #endif
